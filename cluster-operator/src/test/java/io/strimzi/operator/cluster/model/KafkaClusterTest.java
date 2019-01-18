@@ -13,6 +13,7 @@ import io.fabric8.kubernetes.api.model.IntOrString;
 import io.fabric8.kubernetes.api.model.LabelSelectorRequirementBuilder;
 import io.fabric8.kubernetes.api.model.LocalObjectReference;
 import io.fabric8.kubernetes.api.model.OwnerReference;
+import io.fabric8.kubernetes.api.model.PersistentVolumeClaim;
 import io.fabric8.kubernetes.api.model.PodSecurityContextBuilder;
 import io.fabric8.kubernetes.api.model.PodSpec;
 import io.fabric8.kubernetes.api.model.Probe;
@@ -39,6 +40,7 @@ import io.strimzi.api.kafka.model.TlsSidecarBuilder;
 import io.strimzi.api.kafka.model.TlsSidecarLogLevel;
 import io.strimzi.certs.OpenSslCertManager;
 import io.strimzi.operator.cluster.ResourceUtils;
+import io.strimzi.operator.common.Annotations;
 import io.strimzi.operator.common.model.Labels;
 import io.strimzi.test.TestUtils;
 import org.junit.Rule;
@@ -315,13 +317,7 @@ public class KafkaClusterTest {
 
     @Test
     public void testDeleteClaim() {
-        Kafka assembly = ResourceUtils.createKafkaCluster(namespace, cluster, replicas,
-                image, healthDelay, healthTimeout, metricsCm, configuration, emptyMap());
-        KafkaCluster kc = KafkaCluster.fromCrd(assembly, VERSIONS);
-        StatefulSet ss = kc.generateStatefulSet(true);
-        assertFalse(KafkaCluster.deleteClaim(ss));
-
-        assembly = new KafkaBuilder(ResourceUtils.createKafkaCluster(namespace, cluster, replicas,
+        Kafka assembly = new KafkaBuilder(ResourceUtils.createKafkaCluster(namespace, cluster, replicas,
                 image, healthDelay, healthTimeout, metricsCm, configuration, emptyMap()))
                 .editSpec()
                     .editKafka()
@@ -329,9 +325,10 @@ public class KafkaClusterTest {
                     .endKafka()
                 .endSpec()
                 .build();
-        kc = KafkaCluster.fromCrd(assembly, VERSIONS);
-        ss = kc.generateStatefulSet(true);
-        assertFalse(KafkaCluster.deleteClaim(ss));
+        KafkaCluster kc = KafkaCluster.fromCrd(assembly, VERSIONS);
+        List<PersistentVolumeClaim> pvcs = kc.getVolumeClaims();
+        assertFalse(Annotations.booleanAnnotation(pvcs.get(0),
+                AbstractModel.ANNO_STRIMZI_IO_DELETE_CLAIM, false, AbstractModel.ANNO_CO_STRIMZI_IO_DELETE_CLAIM));
 
         assembly = new KafkaBuilder(ResourceUtils.createKafkaCluster(namespace, cluster, replicas,
                 image, healthDelay, healthTimeout, metricsCm, configuration, emptyMap()))
@@ -342,8 +339,11 @@ public class KafkaClusterTest {
                 .endSpec()
                 .build();
         kc = KafkaCluster.fromCrd(assembly, VERSIONS);
-        ss = kc.generateStatefulSet(true);
-        assertTrue(KafkaCluster.deleteClaim(ss));
+        pvcs = kc.getVolumeClaims();
+        assertTrue(Annotations.booleanAnnotation(pvcs.get(0),
+                AbstractModel.ANNO_STRIMZI_IO_DELETE_CLAIM, false, AbstractModel.ANNO_CO_STRIMZI_IO_DELETE_CLAIM));
+
+        // TODO test with JBOD volumes
     }
 
     // TODO test volume claim templates
@@ -358,10 +358,24 @@ public class KafkaClusterTest {
 
     @Test
     public void testPvcNames() {
+        Kafka assembly = new KafkaBuilder(ResourceUtils.createKafkaCluster(namespace, cluster, replicas,
+                image, healthDelay, healthTimeout, metricsCm, configuration, emptyMap()))
+                .editSpec()
+                    .editKafka()
+                        .withStorage(new PersistentClaimStorageBuilder().withDeleteClaim(false).build())
+                    .endKafka()
+                .endSpec()
+                .build();
+        KafkaCluster kc = KafkaCluster.fromCrd(assembly, VERSIONS);
+
+        PersistentVolumeClaim pvc = kc.getVolumeClaims().get(0);
 
         for (int i = 0; i < replicas; i++) {
-            assertEquals(kc.VOLUME_NAME + "-" + KafkaCluster.kafkaPodName(cluster, i), kc.getPersistentVolumeClaimName(i));
+            assertEquals(kc.VOLUME_NAME + "-0-" + KafkaCluster.kafkaPodName(cluster, i),
+                    pvc.getMetadata().getName() + "-" + KafkaCluster.kafkaPodName(cluster, i));
         }
+
+        // TODO test with JBOD volumes
     }
 
     @Test

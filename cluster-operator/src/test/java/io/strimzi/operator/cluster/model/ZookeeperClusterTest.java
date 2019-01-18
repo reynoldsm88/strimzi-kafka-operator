@@ -10,6 +10,7 @@ import io.fabric8.kubernetes.api.model.HasMetadata;
 import io.fabric8.kubernetes.api.model.IntOrString;
 import io.fabric8.kubernetes.api.model.LocalObjectReference;
 import io.fabric8.kubernetes.api.model.OwnerReference;
+import io.fabric8.kubernetes.api.model.PersistentVolumeClaim;
 import io.fabric8.kubernetes.api.model.PodSecurityContextBuilder;
 import io.fabric8.kubernetes.api.model.Secret;
 import io.fabric8.kubernetes.api.model.Service;
@@ -25,6 +26,7 @@ import io.strimzi.api.kafka.model.TlsSidecarLogLevel;
 import io.strimzi.api.kafka.model.ZookeeperClusterSpec;
 import io.strimzi.certs.OpenSslCertManager;
 import io.strimzi.operator.cluster.ResourceUtils;
+import io.strimzi.operator.common.Annotations;
 import io.strimzi.operator.common.model.Labels;
 import io.strimzi.test.TestUtils;
 import org.junit.Rule;
@@ -205,32 +207,19 @@ public class ZookeeperClusterTest {
         assertEquals(new Integer(tlsHealthTimeout), tlsSidecarContainer.getLivenessProbe().getTimeoutSeconds());
     }
 
-    /**
-     * Check that a ZookeeperCluster from a statefulset matches the one from a ConfigMap
-     */
     @Test
     public void testDeleteClaim() {
         Kafka ka = new KafkaBuilder(ResourceUtils.createKafkaCluster(namespace, cluster, replicas, image, healthDelay, healthTimeout, metricsCmJson, configurationJson, zooConfigurationJson))
                 .editSpec()
-                    .editKafka()
-                        .withNewEphemeralStorageStorage().endEphemeralStorageStorage()
-                    .endKafka()
+                    .editZookeeper()
+                        .withNewPersistentClaimStorageStorage().withDeleteClaim(false).endPersistentClaimStorageStorage()
+                    .endZookeeper()
                 .endSpec()
             .build();
         ZookeeperCluster zc = ZookeeperCluster.fromCrd(ka, VERSIONS);
-        StatefulSet ss = zc.generateStatefulSet(true);
-        assertFalse(ZookeeperCluster.deleteClaim(ss));
-
-        ka = new KafkaBuilder(ResourceUtils.createKafkaCluster(namespace, cluster, replicas, image, healthDelay, healthTimeout, metricsCmJson, configurationJson, zooConfigurationJson))
-                .editSpec()
-                    .editKafka()
-                        .withNewPersistentClaimStorageStorage().withDeleteClaim(false).endPersistentClaimStorageStorage()
-                    .endKafka()
-                .endSpec()
-            .build();
-        zc = ZookeeperCluster.fromCrd(ka, VERSIONS);
-        ss = zc.generateStatefulSet(true);
-        assertFalse(ZookeeperCluster.deleteClaim(ss));
+        List<PersistentVolumeClaim> pvcs = zc.getVolumeClaims();
+        assertFalse(Annotations.booleanAnnotation(pvcs.get(0),
+                AbstractModel.ANNO_STRIMZI_IO_DELETE_CLAIM, false, AbstractModel.ANNO_CO_STRIMZI_IO_DELETE_CLAIM));
 
         ka = new KafkaBuilder(ResourceUtils.createKafkaCluster(namespace, cluster, replicas, image, healthDelay, healthTimeout, metricsCmJson, configurationJson, zooConfigurationJson))
                 .editSpec()
@@ -240,8 +229,11 @@ public class ZookeeperClusterTest {
                 .endSpec()
             .build();
         zc = ZookeeperCluster.fromCrd(ka, VERSIONS);
-        ss = zc.generateStatefulSet(true);
-        assertTrue(ZookeeperCluster.deleteClaim(ss));
+        pvcs = zc.getVolumeClaims();
+        assertTrue(Annotations.booleanAnnotation(pvcs.get(0),
+                AbstractModel.ANNO_STRIMZI_IO_DELETE_CLAIM, false, AbstractModel.ANNO_CO_STRIMZI_IO_DELETE_CLAIM));
+
+        // TODO test with JBOD volumes
     }
 
     // TODO test volume claim templates
@@ -256,10 +248,23 @@ public class ZookeeperClusterTest {
 
     @Test
     public void testPvcNames() {
+        Kafka ka = new KafkaBuilder(ResourceUtils.createKafkaCluster(namespace, cluster, replicas, image, healthDelay, healthTimeout, metricsCmJson, configurationJson, zooConfigurationJson))
+                .editSpec()
+                    .editZookeeper()
+                        .withNewPersistentClaimStorageStorage().withDeleteClaim(false).endPersistentClaimStorageStorage()
+                    .endZookeeper()
+                .endSpec()
+                .build();
+        ZookeeperCluster zc = ZookeeperCluster.fromCrd(ka, VERSIONS);
+
+        PersistentVolumeClaim pvc = zc.getVolumeClaims().get(0);
 
         for (int i = 0; i < replicas; i++) {
-            assertEquals(zc.VOLUME_NAME + "-" + ZookeeperCluster.zookeeperClusterName(cluster) + "-" + i, zc.getPersistentVolumeClaimName(i));
+            assertEquals(zc.VOLUME_NAME + "-" + ZookeeperCluster.zookeeperPodName(cluster, i),
+                    pvc.getMetadata().getName() + "-" + ZookeeperCluster.zookeeperPodName(cluster, i));
         }
+
+        // TODO test with JBOD volumes
     }
 
     @Test

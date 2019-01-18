@@ -8,6 +8,7 @@ import io.fabric8.kubernetes.api.model.ConfigMap;
 import io.fabric8.kubernetes.api.model.HasMetadata;
 import io.fabric8.kubernetes.api.model.OwnerReference;
 import io.fabric8.kubernetes.api.model.OwnerReferenceBuilder;
+import io.fabric8.kubernetes.api.model.PersistentVolumeClaim;
 import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.api.model.PodTemplateSpec;
 import io.fabric8.kubernetes.api.model.Secret;
@@ -1791,42 +1792,19 @@ public class KafkaAssemblyOperator extends AbstractAssemblyOperator<KubernetesCl
     private final Future<CompositeFuture> deleteKafka(Reconciliation reconciliation) {
         String namespace = reconciliation.namespace();
         String name = reconciliation.name();
-        log.debug("{}: delete kafka {}", reconciliation, name);
         String kafkaSsName = KafkaCluster.kafkaClusterName(name);
-        StatefulSet ss = kafkaSetOperations.get(namespace, kafkaSsName);
-        int replicas = ss != null ? ss.getSpec().getReplicas() : 0;
-        boolean deleteClaims = ss == null ? false : KafkaCluster.deleteClaim(ss);
-        List<Future> result = new ArrayList<>(deleteClaims ? replicas : 0);
 
-        if (deleteClaims) {
-            log.debug("{}: delete kafka {} PVCs", reconciliation, name);
-
-            for (int i = 0; i < replicas; i++) {
-                result.add(pvcOperations.reconcile(namespace,
-                        KafkaCluster.getPersistentVolumeClaimName(kafkaSsName, i), null));
-            }
-        }
-
-        return CompositeFuture.join(result);
+        Labels pvcSelector = Labels.forCluster(name).withKind(Kafka.RESOURCE_KIND).withName(kafkaSsName);
+        return deletePersistentVolumeClaim(namespace, pvcSelector);
     }
 
     private final Future<CompositeFuture> deleteZk(Reconciliation reconciliation) {
         String namespace = reconciliation.namespace();
         String name = reconciliation.name();
-        log.debug("{}: delete zookeeper {}", reconciliation, name);
         String zkSsName = ZookeeperCluster.zookeeperClusterName(name);
-        StatefulSet ss = zkSetOperations.get(namespace, zkSsName);
-        boolean deleteClaims = ss == null ? false : ZookeeperCluster.deleteClaim(ss);
-        List<Future> result = new ArrayList<>(deleteClaims ? ss.getSpec().getReplicas() : 0);
 
-        if (deleteClaims) {
-            log.debug("{}: delete zookeeper {} PVCs", reconciliation, name);
-            for (int i = 0; i < ss.getSpec().getReplicas(); i++) {
-                result.add(pvcOperations.reconcile(namespace, ZookeeperCluster.getPersistentVolumeClaimName(zkSsName, i), null));
-            }
-        }
-
-        return CompositeFuture.join(result);
+        Labels pvcSelector = Labels.forCluster(name).withKind(Kafka.RESOURCE_KIND).withName(zkSsName);
+        return deletePersistentVolumeClaim(namespace, pvcSelector);
     }
 
     @Override
@@ -1844,5 +1822,28 @@ public class KafkaAssemblyOperator extends AbstractAssemblyOperator<KubernetesCl
 
     private Date dateSupplier() {
         return new Date();
+    }
+
+    /**
+     * Delete Persistent Volume Claims in the specified {@code namespace} and having the
+     * labels described by {@code pvcSelector} if the related {@link AbstractModel#ANNO_STRIMZI_IO_DELETE_CLAIM}
+     * annotation is
+     *
+     * @param namespace namespace where the Persistent Volume Claims to delete are
+     * @param pvcSelector labels to select the Persistent Volume Claims to delete
+     * @return
+     */
+    private Future<CompositeFuture> deletePersistentVolumeClaim(String namespace, Labels pvcSelector) {
+        List<PersistentVolumeClaim> pvcs = pvcOperations.list(namespace, pvcSelector);
+        List<Future> result = new ArrayList<>();
+
+        for (PersistentVolumeClaim pvc: pvcs) {
+            if (Annotations.booleanAnnotation(pvc, AbstractModel.ANNO_STRIMZI_IO_DELETE_CLAIM,
+                    false, AbstractModel.ANNO_CO_STRIMZI_IO_DELETE_CLAIM)) {
+                log.debug("Delete selected PVCs with labels", pvcSelector);
+                result.add(pvcOperations.reconcile(namespace, pvc.getMetadata().getName(), null));
+            }
+        }
+        return CompositeFuture.join(result);
     }
 }

@@ -68,6 +68,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.StringWriter;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -97,9 +98,9 @@ public abstract class AbstractModel {
     public static final String ENV_VAR_STRIMZI_KAFKA_GC_LOG_ENABLED = "STRIMZI_KAFKA_GC_LOG_ENABLED";
     public static final String ENV_VAR_STRIMZI_GC_LOG_ENABLED = "STRIMZI_GC_LOG_ENABLED";
 
-    private static final String ANNO_STRIMZI_IO_DELETE_CLAIM = Annotations.STRIMZI_DOMAIN + "/delete-claim";
+    public static final String ANNO_STRIMZI_IO_DELETE_CLAIM = Annotations.STRIMZI_DOMAIN + "/delete-claim";
     @Deprecated
-    private static final String ANNO_CO_STRIMZI_IO_DELETE_CLAIM = "cluster.operator.strimzi.io/delete-claim";
+    public static final String ANNO_CO_STRIMZI_IO_DELETE_CLAIM = "cluster.operator.strimzi.io/delete-claim";
 
     protected static final String DEFAULT_KAFKA_GC_LOG_ENABLED = String.valueOf(true);
     protected static final String DEFAULT_STRIMZI_GC_LOG_ENABED = String.valueOf(true);
@@ -595,8 +596,7 @@ public abstract class AbstractModel {
         return servicePort;
     }
 
-    protected PersistentVolumeClaim createPersistentVolumeClaim(String name) {
-        PersistentClaimStorage storage = (PersistentClaimStorage) this.storage;
+    protected PersistentVolumeClaim createPersistentVolumeClaim(String name, PersistentClaimStorage storage) {
         Map<String, Quantity> requests = new HashMap<>();
         requests.put("storage", new Quantity(storage.getSize(), null));
         LabelSelector selector = null;
@@ -607,14 +607,16 @@ public abstract class AbstractModel {
         PersistentVolumeClaimBuilder pvcb = new PersistentVolumeClaimBuilder()
                 .withNewMetadata()
                     .withName(name)
+                    .withAnnotations(Collections.singletonMap(ANNO_STRIMZI_IO_DELETE_CLAIM,
+                            String.valueOf(storage.isDeleteClaim())))
                 .endMetadata()
                 .withNewSpec()
-                .withAccessModes("ReadWriteOnce")
-                .withNewResources()
-                .withRequests(requests)
-                .endResources()
-                .withStorageClassName(storage.getStorageClass())
-                .withSelector(selector)
+                    .withAccessModes("ReadWriteOnce")
+                    .withNewResources()
+                    .withRequests(requests)
+                    .endResources()
+                    .withStorageClassName(storage.getStorageClass())
+                    .withSelector(selector)
                 .endSpec();
 
         return pvcb.build();
@@ -758,17 +760,11 @@ public abstract class AbstractModel {
             List<Container> containers,
             boolean isOpenShift) {
 
-        annotations = new HashMap<>(annotations);
-
-        annotations.put(ANNO_STRIMZI_IO_DELETE_CLAIM,
-                String.valueOf(storage instanceof PersistentClaimStorage
-                        && ((PersistentClaimStorage) storage).isDeleteClaim()));
-
         PodSecurityContext securityContext = templateSecurityContext;
 
         // if a persistent volume claim is requested and the running cluster is a Kubernetes one and we have no user configured PodSecurityContext
         // we set the security context
-        if (this.storage instanceof PersistentClaimStorage && !isOpenShift && securityContext == null) {
+        if (ModelUtils.containsPersistentStorage(storage) && !isOpenShift && securityContext == null) {
             securityContext = new PodSecurityContextBuilder()
                     .withFsGroup(AbstractModel.DEFAULT_FS_GROUPID)
                     .build();
@@ -1009,15 +1005,6 @@ public abstract class AbstractModel {
         this.ownerApiVersion = parent.getApiVersion();
         this.ownerKind = parent.getKind();
         this.ownerUid = parent.getMetadata().getUid();
-    }
-
-    public static boolean deleteClaim(StatefulSet ss) {
-        if (!ss.getSpec().getVolumeClaimTemplates().isEmpty()) {
-            return Annotations.booleanAnnotation(ss, ANNO_STRIMZI_IO_DELETE_CLAIM,
-                    false, ANNO_CO_STRIMZI_IO_DELETE_CLAIM);
-        } else {
-            return false;
-        }
     }
 
     /**
