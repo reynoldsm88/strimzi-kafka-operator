@@ -55,6 +55,7 @@ import org.apache.logging.log4j.Logger;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestInfo;
+import org.junit.jupiter.api.TestInstance;
 
 import java.io.File;
 import java.text.SimpleDateFormat;
@@ -85,6 +86,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public abstract class AbstractST {
 
     private static final String CO_INSTALL_DIR = "../install/cluster-operator";
@@ -439,7 +441,7 @@ public abstract class AbstractST {
         resources = new Resources(namespacedClient());
     }
 
-    protected static void createClusterOperatorResources() {
+    protected static void createTestClassResources() {
         LOGGER.info("Creating cluster operator resources");
         testClassResources = new Resources(namespacedClient());
     }
@@ -1113,7 +1115,7 @@ public abstract class AbstractST {
         testClassResources.kubernetesRoleBinding("../install/cluster-operator/032-RoleBinding-strimzi-cluster-operator-topic-operator-delegation.yaml", namespace, clientNamespace);
     }
 
-    static void applyClusterOperatorInstallFiles() {
+    protected void applyClusterOperatorInstallFiles() {
         clusterOperatorMap = Arrays.stream(new File(CO_INSTALL_DIR).listFiles()).sorted().filter(file ->
                 !file.getName().matches(".*(Binding|Deployment)-.*")
         ).collect(Collectors.toMap(file -> file, f -> TestUtils.getContent(f, TestUtils::toYamlString), (x, y) -> x, LinkedHashMap::new));
@@ -1123,29 +1125,14 @@ public abstract class AbstractST {
         }
     }
 
-    static void deleteClusterOperatorInstallFiles() {
+    protected void deleteClusterOperatorInstallFiles() {
         for (Map.Entry<File, String> entry : clusterOperatorMap.entrySet()) {
             LOGGER.info("Deleting {}", entry.getKey());
             kubeClient.clientWithAdmin().deleteContent(entry.getValue());
         }
     }
 
-    static void createCustomResrouces(List<String> resources) {
-        deploymentResources = resources;
-        for (String resource : resources) {
-            LOGGER.info("Creating resources {}", resource);
-            kubeClient.create(resource);
-        }
-    }
-
-    static void deleteCustomResrouces() {
-        for (String resource : deploymentResources) {
-            LOGGER.info("Deleting resources {}", resource);
-            kubeClient.delete(resource);
-        }
-    }
-
-    static void createNamespaces(String useNamespace, List<String> namespaces) {
+    protected void createNamespaces(String useNamespace, List<String> namespaces) {
         clientNamespace = useNamespace;
         deploymentNamespaces = namespaces;
         for (String namespace: namespaces) {
@@ -1158,10 +1145,14 @@ public abstract class AbstractST {
         kubeClient.namespace(useNamespace);
     }
 
-    static void deleteNamespaces() {
+    protected void createNamespaces(String useNamespace) {
+        createNamespaces(useNamespace, Collections.singletonList(useNamespace));
+    }
+
+    protected void deleteNamespaces() {
         for (String namespace: deploymentNamespaces) {
             LOGGER.info("Deleting namespace: {}", namespace);
-            kubeClient.createNamespace(namespace);
+            kubeClient.deleteNamespace(namespace);
             kubeClient.waitForResourceDeletion("Namespace", namespace);
             LOGGER.info("Namespace {} deleted", namespace);
         }
@@ -1169,15 +1160,40 @@ public abstract class AbstractST {
         kubeClient.namespace(clientNamespace);
     }
 
-    static void prepareEnvForOperator(String clientNamespace, List<String> namespaces, List<String> resources) {
+    protected void createCustomResources(List<String> resources) {
+        LOGGER.info(System.getProperty("user.dir"));
+        deploymentResources = resources;
+        for (String resource : resources) {
+            LOGGER.info("Creating resources {}", resource);
+            LOGGER.info(kubeClient.namespace());
+            kubeClient.clientWithAdmin().create(resource);
+        }
+    }
+
+    protected void deleteCustomResources() {
+        for (String resource : deploymentResources) {
+            LOGGER.info("Deleting resources {}", resource);
+            kubeClient.delete(resource);
+        }
+    }
+
+    protected void prepareEnvForOperator(String clientNamespace, List<String> namespaces, List<String> resources) {
         createNamespaces(clientNamespace, namespaces);
-        createCustomResrouces(resources);
+        createCustomResources(resources);
         applyClusterOperatorInstallFiles();
     }
 
-    static void tearodownEnvForOperator(String clientNamespace, String... namespaces) {
-        deleteCustomResrouces();
+    protected void prepareEnvForOperator(String clientNamespace, List<String> resources) {
+        prepareEnvForOperator(clientNamespace, Collections.singletonList(clientNamespace), resources);
+    }
+
+    protected void prepareEnvForOperator(String clientNamespace) {
+        prepareEnvForOperator(clientNamespace, Collections.singletonList(clientNamespace), Collections.emptyList());
+    }
+
+    protected void teardownEnvForOperator() {
         deleteClusterOperatorInstallFiles();
+        deleteCustomResources();
         deleteNamespaces();
     }
 
@@ -1188,7 +1204,6 @@ public abstract class AbstractST {
 
     @BeforeAll
     static void createTestClassResources(TestInfo testInfo) {
-        createClusterOperatorResources();
         testClass = testInfo.getTestClass().get().getSimpleName();
     }
 }

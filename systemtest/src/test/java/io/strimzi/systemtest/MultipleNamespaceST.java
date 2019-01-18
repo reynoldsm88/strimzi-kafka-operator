@@ -4,8 +4,6 @@
  */
 package io.strimzi.systemtest;
 
-import io.strimzi.test.annotations.ClusterOperator;
-import io.strimzi.test.annotations.Namespace;
 import io.strimzi.test.extensions.StrimziExtension;
 import io.strimzi.test.TestUtils;
 import org.apache.logging.log4j.LogManager;
@@ -15,10 +13,11 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.io.File;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import static io.strimzi.test.extensions.StrimziExtension.REGRESSION;
@@ -27,9 +26,6 @@ import static org.hamcrest.Matchers.hasItems;
 import static org.hamcrest.Matchers.not;
 
 @ExtendWith(StrimziExtension.class)
-@Namespace(MultipleNamespaceST.DEFAULT_NAMESPACE)
-@Namespace(value = MultipleNamespaceST.SECOND_NAMESPACE, use = false)
-@ClusterOperator
 class MultipleNamespaceST extends AbstractST {
     private static final Logger LOGGER = LogManager.getLogger(KafkaST.class);
     static final String DEFAULT_NAMESPACE = "multiple-namespace-test";
@@ -86,46 +82,6 @@ class MultipleNamespaceST extends AbstractST {
         kubeClient.waitForDeployment(CLUSTER_NAME + "-mirror-maker", 1);
     }
 
-    @BeforeEach
-    void createSecondNamespaceResources() {
-        kubeClient.namespace(SECOND_NAMESPACE);
-        secondNamespaceResources = new Resources(namespacedClient());
-        kubeClient.namespace(DEFAULT_NAMESPACE);
-    }
-
-    @AfterEach
-    void deleteSecondNamespaceResources() throws Exception {
-        secondNamespaceResources.deleteResources();
-        waitForDeletion(TEARDOWN_GLOBAL_WAIT, SECOND_NAMESPACE);
-        kubeClient.namespace(DEFAULT_NAMESPACE);
-    }
-
-    @BeforeAll
-    static void createClassResources(TestInfo testInfo) {
-        LOGGER.info("Creating resources before the test class");
-        applyRoleBindings(DEFAULT_NAMESPACE, DEFAULT_NAMESPACE);
-        applyRoleBindings(DEFAULT_NAMESPACE, SECOND_NAMESPACE);
-        // 050-Deployment
-        testClassResources.clusterOperator(String.join(",", DEFAULT_NAMESPACE, SECOND_NAMESPACE)).done();
-
-        classResources = new Resources(namespacedClient());
-        classResources().kafkaEphemeral(CLUSTER_NAME, 3)
-            .editSpec()
-                .editEntityOperator()
-                    .editTopicOperator()
-                        .withWatchedNamespace(SECOND_NAMESPACE)
-                    .endTopicOperator()
-                .endEntityOperator()
-            .endSpec()
-            .done();
-
-        testClass = testInfo.getTestClass().get().getSimpleName();
-    }
-
-    private static Resources classResources() {
-        return classResources;
-    }
-
     private void deployNewTopic(String namespace, String topic) {
         LOGGER.info("Creating topic {} in namespace {}", topic, namespace);
         kubeClient.namespace(namespace);
@@ -142,5 +98,41 @@ class MultipleNamespaceST extends AbstractST {
         kubeClient.namespace(namespace);
         kubeClient.deleteByName("KafkaTopic", topic);
         kubeClient.namespace(DEFAULT_NAMESPACE);
+    }
+
+    @BeforeEach
+    void createSecondNamespaceResources() {
+        kubeClient.namespace(SECOND_NAMESPACE);
+        secondNamespaceResources = new Resources(namespacedClient());
+        kubeClient.namespace(DEFAULT_NAMESPACE);
+    }
+
+    @AfterEach
+    void deleteSecondNamespaceResources() throws Exception {
+        secondNamespaceResources.deleteResources();
+        waitForDeletion(TEARDOWN_GLOBAL_WAIT, SECOND_NAMESPACE);
+        kubeClient.namespace(DEFAULT_NAMESPACE);
+    }
+
+    @BeforeAll
+    void createClassResources() {
+        LOGGER.info("Creating resources before the test class");
+        createTestClassResources();
+
+        prepareEnvForOperator(DEFAULT_NAMESPACE, Arrays.asList(DEFAULT_NAMESPACE, SECOND_NAMESPACE), Collections.emptyList());
+        applyRoleBindings(DEFAULT_NAMESPACE, DEFAULT_NAMESPACE);
+        applyRoleBindings(DEFAULT_NAMESPACE, SECOND_NAMESPACE);
+        // 050-Deployment
+        testClassResources.clusterOperator(String.join(",", DEFAULT_NAMESPACE, SECOND_NAMESPACE)).done();
+
+        testClassResources.kafkaEphemeral(CLUSTER_NAME, 3)
+            .editSpec()
+                .editEntityOperator()
+                    .editTopicOperator()
+                        .withWatchedNamespace(SECOND_NAMESPACE)
+                    .endTopicOperator()
+                .endEntityOperator()
+            .endSpec()
+            .done();
     }
 }

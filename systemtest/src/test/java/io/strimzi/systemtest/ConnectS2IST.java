@@ -5,12 +5,11 @@
 package io.strimzi.systemtest;
 
 import io.strimzi.systemtest.utils.StUtils;
-import io.strimzi.test.annotations.ClusterOperator;
-import io.strimzi.test.annotations.Namespace;
 import io.strimzi.test.annotations.OpenShiftOnly;
 import io.strimzi.test.extensions.StrimziExtension;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -27,8 +26,6 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
 
 @ExtendWith(StrimziExtension.class)
-@Namespace(ConnectS2IST.NAMESPACE)
-@ClusterOperator
 @Disabled
 class ConnectS2IST extends AbstractST {
 
@@ -36,7 +33,6 @@ class ConnectS2IST extends AbstractST {
     public static final String CONNECT_CLUSTER_NAME = "connect-s2i-tests";
     public static final String CONNECT_DEPLOYMENT_NAME = CONNECT_CLUSTER_NAME + "-connect";
     private static final Logger LOGGER = LogManager.getLogger(ConnectS2IST.class);
-    private static Resources classResources;
 
     @Test
     @OpenShiftOnly
@@ -75,17 +71,20 @@ class ConnectS2IST extends AbstractST {
     }
 
     @BeforeAll
-    static void createClassResources() {
+    void setupEnvironment() {
         LOGGER.info("Creating resources before the test class");
+        createTestClassResources();
+
+        prepareEnvForOperator(NAMESPACE);
         applyRoleBindings(NAMESPACE, NAMESPACE);
         // 050-Deployment
         testClassResources.clusterOperator(NAMESPACE).done();
-
-        classResources = new Resources(namespacedClient());
-        classResources().kafkaEphemeral(CONNECT_CLUSTER_NAME, 3).done();
+        testClassResources.kafkaEphemeral(CONNECT_CLUSTER_NAME, 3).done();
     }
 
-    private static Resources classResources() {
-        return classResources;
+    @AfterAll
+    void teardownEnvironment() {
+        testClassResources.deleteResources();
+        teardownEnvForOperator();
     }
 }

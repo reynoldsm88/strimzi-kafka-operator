@@ -6,8 +6,6 @@ package io.strimzi.systemtest;
 
 import io.strimzi.systemtest.timemeasuring.Operation;
 import io.strimzi.systemtest.timemeasuring.TimeMeasuringSystem;
-import io.strimzi.test.annotations.ClusterOperator;
-import io.strimzi.test.annotations.Namespace;
 import io.strimzi.test.extensions.StrimziExtension;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -26,8 +24,6 @@ import static io.strimzi.test.k8s.BaseKubeClient.STATEFUL_SET;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @ExtendWith(StrimziExtension.class)
-@Namespace(LogLevelST.NAMESPACE)
-@ClusterOperator
 @Tag(REGRESSION)
 class LogLevelST extends AbstractST {
     static final String NAMESPACE = "log-level-cluster-test";
@@ -91,9 +87,6 @@ class LogLevelST extends AbstractST {
         }
     };
 
-    private static Resources classResources;
-
-
     @Test
     void testKafkaLoggers() {
         int duration = TimeMeasuringSystem.getCurrentDuration(testClass, testClass, operationID);
@@ -148,13 +141,15 @@ class LogLevelST extends AbstractST {
     }
 
     @BeforeAll
-    static void createClassResources(TestInfo testInfo) {
+    void createClassResources(TestInfo testInfo) {
         LOGGER.info("Create resources for the tests");
+        createTestClassResources();
+
+        prepareEnvForOperator(NAMESPACE);
         applyRoleBindings(NAMESPACE, NAMESPACE);
         // 050-Deployment
         testClassResources.clusterOperator(NAMESPACE).done();
 
-        testClass = testInfo.getTestClass().get().getSimpleName();
         operationID = startDeploymentMeasuring();
         String targetKafka = CLUSTER_NAME + "-target";
 
@@ -207,10 +202,6 @@ class LogLevelST extends AbstractST {
     @AfterAll
     static void deleteClassResources() {
         TimeMeasuringSystem.stopOperation(operationID);
-    }
-
-    private static Resources classResources() {
-        return classResources;
     }
 
     private static String startDeploymentMeasuring() {
