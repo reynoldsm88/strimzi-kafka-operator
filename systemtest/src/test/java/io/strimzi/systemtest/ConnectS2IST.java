@@ -73,9 +73,9 @@ class ConnectS2IST extends AbstractST {
     @BeforeAll
     void setupEnvironment() {
         LOGGER.info("Creating resources before the test class");
-        createTestClassResources();
-
         prepareEnvForOperator(NAMESPACE);
+
+        createTestClassResources();
         applyRoleBindings(NAMESPACE, NAMESPACE);
         // 050-Deployment
         testClassResources.clusterOperator(NAMESPACE).done();
