@@ -332,7 +332,7 @@ public abstract class StatefulSetOperator extends AbstractScalableResourceOperat
             List<Volume> volumes = current.getSpec().getTemplate().getSpec().getVolumes();
             for (int i = 0; i < volumes.size(); i++) {
                 Volume vol = volumes.get(i);
-                if (AbstractModel.VOLUME_NAME.equals(vol.getName()) && vol.getEmptyDir() != null) {
+                if (vol.getName().startsWith(AbstractModel.VOLUME_NAME) && vol.getEmptyDir() != null) {
                     desired.getSpec().getTemplate().getSpec().getVolumes().add(0, volumes.get(i));
                     break;
                 }
@@ -342,7 +342,7 @@ public abstract class StatefulSetOperator extends AbstractScalableResourceOperat
             List<Volume> volumes = desired.getSpec().getTemplate().getSpec().getVolumes();
             for (int i = 0; i < volumes.size(); i++) {
                 Volume vol = volumes.get(i);
-                if (AbstractModel.VOLUME_NAME.equals(vol.getName()) && vol.getEmptyDir() != null) {
+                if (vol.getName().startsWith(AbstractModel.VOLUME_NAME) && vol.getEmptyDir() != null) {
                     volumes.remove(i);
                     break;
                 }

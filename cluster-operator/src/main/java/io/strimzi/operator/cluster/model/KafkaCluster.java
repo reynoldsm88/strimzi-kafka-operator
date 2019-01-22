@@ -96,7 +96,7 @@ public class KafkaCluster extends AbstractModel {
     private static final String ENV_VAR_KAFKA_AUTHORIZATION_SUPER_USERS = "KAFKA_AUTHORIZATION_SUPER_USERS";
     public static final String ENV_VAR_KAFKA_ZOOKEEPER_CONNECT = "KAFKA_ZOOKEEPER_CONNECT";
     private static final String ENV_VAR_KAFKA_METRICS_ENABLED = "KAFKA_METRICS_ENABLED";
-    private static final String ENV_VAR_KAFKA_LOG_DIRS = "KAFKA_LOG_DIRS";
+    public static final String ENV_VAR_KAFKA_LOG_DIRS = "KAFKA_LOG_DIRS";
 
     public static final String ENV_VAR_KAFKA_CONFIGURATION = "KAFKA_CONFIGURATION";
 
