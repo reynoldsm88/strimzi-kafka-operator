@@ -68,7 +68,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.StringWriter;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -607,8 +606,6 @@ public abstract class AbstractModel {
         PersistentVolumeClaimBuilder pvcb = new PersistentVolumeClaimBuilder()
                 .withNewMetadata()
                     .withName(name)
-                    .withAnnotations(Collections.singletonMap(ANNO_STRIMZI_IO_DELETE_CLAIM,
-                            String.valueOf(storage.isDeleteClaim())))
                 .endMetadata()
                 .withNewSpec()
                     .withAccessModes("ReadWriteOnce")
