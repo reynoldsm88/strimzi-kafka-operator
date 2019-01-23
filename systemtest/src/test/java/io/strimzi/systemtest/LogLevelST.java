@@ -204,7 +204,7 @@ class LogLevelST extends AbstractST {
         TimeMeasuringSystem.stopOperation(operationID);
     }
 
-    private static String startDeploymentMeasuring() {
+    private String startDeploymentMeasuring() {
         TimeMeasuringSystem.setTestName(testClass, testClass);
         return TimeMeasuringSystem.startOperation(Operation.CLASS_EXECUTION);
     }
