@@ -165,6 +165,6 @@ public class StrimziUpgradeST extends AbstractST {
     @BeforeAll
     void createClusterOperator() {
         LOGGER.info("Creating resources before the test class");
-        createNamespaces(NAMESPACE);
+        createNamespace(NAMESPACE);
     }
 }
