@@ -28,6 +28,7 @@ import io.fabric8.kubernetes.api.model.networking.NetworkPolicyPeerBuilder;
 import io.fabric8.kubernetes.api.model.policy.PodDisruptionBudget;
 import io.fabric8.openshift.api.model.Route;
 import io.strimzi.api.kafka.model.InlineLogging;
+import io.strimzi.api.kafka.model.JbodStorageBuilder;
 import io.strimzi.api.kafka.model.Kafka;
 import io.strimzi.api.kafka.model.KafkaBuilder;
 import io.strimzi.api.kafka.model.KafkaClusterSpec;
@@ -40,7 +41,6 @@ import io.strimzi.api.kafka.model.TlsSidecarBuilder;
 import io.strimzi.api.kafka.model.TlsSidecarLogLevel;
 import io.strimzi.certs.OpenSslCertManager;
 import io.strimzi.operator.cluster.ResourceUtils;
-import io.strimzi.operator.common.Annotations;
 import io.strimzi.operator.common.model.Labels;
 import io.strimzi.test.TestUtils;
 import org.junit.Rule;
@@ -65,7 +65,6 @@ import static java.util.Arrays.asList;
 import static java.util.Collections.emptyMap;
 import static java.util.Collections.singletonMap;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
@@ -317,37 +316,6 @@ public class KafkaClusterTest {
         }
     }
 
-    @Test
-    public void testDeleteClaim() {
-        Kafka assembly = new KafkaBuilder(ResourceUtils.createKafkaCluster(namespace, cluster, replicas,
-                image, healthDelay, healthTimeout, metricsCm, configuration, emptyMap()))
-                .editSpec()
-                    .editKafka()
-                        .withStorage(new PersistentClaimStorageBuilder().withDeleteClaim(false).withSize("100Gi").build())
-                    .endKafka()
-                .endSpec()
-                .build();
-        KafkaCluster kc = KafkaCluster.fromCrd(assembly, VERSIONS);
-        List<PersistentVolumeClaim> pvcs = kc.getVolumeClaims();
-        assertFalse(Annotations.booleanAnnotation(pvcs.get(0),
-                AbstractModel.ANNO_STRIMZI_IO_DELETE_CLAIM, false, AbstractModel.ANNO_CO_STRIMZI_IO_DELETE_CLAIM));
-
-        assembly = new KafkaBuilder(ResourceUtils.createKafkaCluster(namespace, cluster, replicas,
-                image, healthDelay, healthTimeout, metricsCm, configuration, emptyMap()))
-                .editSpec()
-                    .editKafka()
-                        .withStorage(new PersistentClaimStorageBuilder().withDeleteClaim(true).withSize("100Gi").build())
-                    .endKafka()
-                .endSpec()
-                .build();
-        kc = KafkaCluster.fromCrd(assembly, VERSIONS);
-        pvcs = kc.getVolumeClaims();
-        assertTrue(Annotations.booleanAnnotation(pvcs.get(0),
-                AbstractModel.ANNO_STRIMZI_IO_DELETE_CLAIM, false, AbstractModel.ANNO_CO_STRIMZI_IO_DELETE_CLAIM));
-
-        // TODO test with JBOD volumes
-    }
-
     // TODO test volume claim templates
 
     @Test
@@ -364,20 +332,41 @@ public class KafkaClusterTest {
                 image, healthDelay, healthTimeout, metricsCm, configuration, emptyMap()))
                 .editSpec()
                     .editKafka()
-                        .withStorage(new PersistentClaimStorageBuilder().withDeleteClaim(false).build())
+                        .withStorage(new PersistentClaimStorageBuilder().withDeleteClaim(false).withSize("100Gi").build())
                     .endKafka()
                 .endSpec()
                 .build();
         KafkaCluster kc = KafkaCluster.fromCrd(assembly, VERSIONS);
 
-        PersistentVolumeClaim pvc = kc.getVolumeClaims().get(0);
+        List<PersistentVolumeClaim> pvcs = kc.getVolumeClaims();
 
         for (int i = 0; i < replicas; i++) {
             assertEquals(kc.VOLUME_NAME + "-0-" + KafkaCluster.kafkaPodName(cluster, i),
-                    pvc.getMetadata().getName() + "-" + KafkaCluster.kafkaPodName(cluster, i));
+                    pvcs.get(0).getMetadata().getName() + "-" + KafkaCluster.kafkaPodName(cluster, i));
         }
 
-        // TODO test with JBOD volumes
+        assembly = new KafkaBuilder(ResourceUtils.createKafkaCluster(namespace, cluster, replicas,
+                image, healthDelay, healthTimeout, metricsCm, configuration, emptyMap()))
+                .editSpec()
+                    .editKafka()
+                        .withStorage(new JbodStorageBuilder().withVolumes(
+                            new PersistentClaimStorageBuilder().withDeleteClaim(false).withId(0).withSize("100Gi").build(),
+                            new PersistentClaimStorageBuilder().withDeleteClaim(true).withId(1).withSize("100Gi").build())
+                            .build())
+                    .endKafka()
+                .endSpec()
+                .build();
+        kc = KafkaCluster.fromCrd(assembly, VERSIONS);
+
+        pvcs = kc.getVolumeClaims();
+
+        for (int i = 0; i < replicas; i++) {
+            int id = 0;
+            for (PersistentVolumeClaim pvc : pvcs) {
+                assertEquals(kc.VOLUME_NAME + "-" + id++ + "-" + KafkaCluster.kafkaPodName(cluster, i),
+                        pvc.getMetadata().getName() + "-" + KafkaCluster.kafkaPodName(cluster, i));
+            }
+        }
     }
 
     @Test
