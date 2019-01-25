@@ -1009,7 +1009,9 @@ public class KafkaAssemblyOperator extends AbstractAssemblyOperator<KubernetesCl
                     PersistentVolumeClaim pvc = annotateDeleteClaim(reconciliation.namespace(),
                             AbstractModel.VOLUME_NAME + "-" + ZookeeperCluster.zookeeperClusterName(reconciliation.name()) + "-" + i,
                             storage.isDeleteClaim());
-                    pvcOperations.reconcile(namespace, pvc.getMetadata().getName(), pvc);
+                    if (pvc != null) {
+                        pvcOperations.reconcile(namespace, pvc.getMetadata().getName(), pvc);
+                    }
                 }
             }
             return Future.succeededFuture(this);
@@ -1474,7 +1476,9 @@ public class KafkaAssemblyOperator extends AbstractAssemblyOperator<KubernetesCl
                     PersistentVolumeClaim pvc = annotateDeleteClaim(reconciliation.namespace(),
                             AbstractModel.VOLUME_NAME + "-0-" + KafkaCluster.kafkaClusterName(reconciliation.name()) + "-" + i,
                             storage.isDeleteClaim());
-                    pvcOperations.reconcile(namespace, pvc.getMetadata().getName(), pvc);
+                    if (pvc != null) {
+                        pvcOperations.reconcile(namespace, pvc.getMetadata().getName(), pvc);
+                    }
                 }
             } else if (kafkaCluster.getStorage() instanceof JbodStorage) {
 
@@ -1488,7 +1492,9 @@ public class KafkaAssemblyOperator extends AbstractAssemblyOperator<KubernetesCl
                             PersistentVolumeClaim pvc = annotateDeleteClaim(reconciliation.namespace(),
                                     AbstractModel.VOLUME_NAME + "-" + volume.getId() + "-" + KafkaCluster.kafkaClusterName(reconciliation.name()) + "-" + i,
                                     ((PersistentClaimStorage) volume).isDeleteClaim());
-                            pvcOperations.reconcile(namespace, pvc.getMetadata().getName(), pvc);
+                            if (pvc != null) {
+                                pvcOperations.reconcile(namespace, pvc.getMetadata().getName(), pvc);
+                            }
                         }
                     }
                 }
@@ -1823,7 +1829,11 @@ public class KafkaAssemblyOperator extends AbstractAssemblyOperator<KubernetesCl
 
         private PersistentVolumeClaim annotateDeleteClaim(String namespace, String pvcName, boolean isDeleteClaim) {
             PersistentVolumeClaim pvc = pvcOperations.get(namespace, pvcName);
-            Annotations.annotations(pvc).put(AbstractModel.ANNO_STRIMZI_IO_DELETE_CLAIM, String.valueOf(isDeleteClaim));
+            // this is called during a reconcile even when user is trying to change from ephemeral to persistent which
+            // is not allowed, so the PVC doesn't exist
+            if (pvc != null) {
+                Annotations.annotations(pvc).put(AbstractModel.ANNO_STRIMZI_IO_DELETE_CLAIM, String.valueOf(isDeleteClaim));
+            }
             return pvc;
         }
 
