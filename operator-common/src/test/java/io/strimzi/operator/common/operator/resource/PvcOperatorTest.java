@@ -12,8 +12,6 @@ import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.kubernetes.client.dsl.MixedOperation;
 import io.fabric8.kubernetes.client.dsl.Resource;
 import io.vertx.core.Vertx;
-import io.vertx.ext.unit.TestContext;
-import org.junit.Test;
 
 import static org.mockito.Mockito.when;
 
