@@ -43,28 +43,4 @@ public class PvcOperatorTest extends AbstractResourceOperatorTest<KubernetesClie
     protected PvcOperator createResourceOperations(Vertx vertx, KubernetesClient mockClient) {
         return new PvcOperator(vertx, mockClient);
     }
-
-    @Override
-    @Test(expected = UnsupportedOperationException.class)
-    public void createWhenExistsIsAPatch(TestContext context) {
-        super.createWhenExistsIsAPatch(context);
-    }
-
-    @Override
-    @Test(expected = UnsupportedOperationException.class)
-    public void successfulCreation(TestContext context) {
-        super.successfulCreation(context);
-    }
-
-    @Override
-    @Test(expected = UnsupportedOperationException.class)
-    public void creationThrows(TestContext context) {
-        super.creationThrows(context);
-    }
-
-    @Override
-    @Test(expected = UnsupportedOperationException.class)
-    public void existenceCheckThrows(TestContext context) {
-        super.existenceCheckThrows(context);
-    }
 }
