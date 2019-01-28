@@ -62,7 +62,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.function.BiFunction;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static io.strimzi.api.kafka.model.Quantities.normalizeCpu;
@@ -309,21 +308,11 @@ public class KafkaAssemblyOperatorMockTest {
      */
     private Set<String> resilientPvcs() {
         Set<String> expectedClaims = new HashSet<>();
-        /*
-        Set<String> kafkaPvcNames = createPvcs(kafkaStorage,
-                kafkaReplicas, podId -> KafkaCluster.getPersistentVolumeClaimName(KafkaCluster.kafkaClusterName(CLUSTER_NAME), podId)
-        );
-        */
         Set<String> kafkaPvcNames = createPvcs(NAMESPACE, kafkaStorage, kafkaReplicas,
             (replica, storageId) -> AbstractModel.VOLUME_NAME + "-" + storageId + "-" + KafkaCluster.kafkaPodName(CLUSTER_NAME, replica));
         if (!deleteClaim(kafkaStorage)) {
             expectedClaims.addAll(kafkaPvcNames);
         }
-        /*
-        Set<String> zkPvcNames = createPvcs(zkStorage,
-                zkReplicas, podId -> ZookeeperCluster.getPersistentVolumeClaimName(ZookeeperCluster.zookeeperClusterName(CLUSTER_NAME), podId)
-        );
-        */
         Set<String> zkPvcNames = createPvcs(NAMESPACE, zkStorage, zkReplicas,
             (replica, storageId) -> AbstractModel.VOLUME_NAME + "-" + ZookeeperCluster.zookeeperPodName(CLUSTER_NAME, replica));
         if (!deleteClaim(zkStorage)) {
@@ -337,23 +326,6 @@ public class KafkaAssemblyOperatorMockTest {
      * according to the given storage, number of replicas and naming scheme,
      * return the names of the PVCs created
      */
-    private Set<String> createPvcs(Storage storage, int replicas, Function<Integer, String> pvcNameFn) {
-        Set<String> expectedClaims = new HashSet<>();
-        if (storage instanceof PersistentClaimStorage) {
-            for (int i = 0; i < replicas; i++) {
-                String pvcName = pvcNameFn.apply(i);
-                mockClient.persistentVolumeClaims().inNamespace(NAMESPACE).withName(pvcName).create(
-                        new PersistentVolumeClaimBuilder().withNewMetadata()
-                                .withNamespace(NAMESPACE)
-                                .withName(pvcName)
-                                .endMetadata()
-                                .build());
-                expectedClaims.add(pvcName);
-            }
-        }
-        return expectedClaims;
-    }
-
     private Set<String> createPvcs(String namespace, Storage storage, int replicas, BiFunction<Integer, Integer, String> pvcNameFunction) {
         Set<String> expectedClaims = new HashSet<>();
         if (storage instanceof PersistentClaimStorage) {
@@ -608,14 +580,6 @@ public class KafkaAssemblyOperatorMockTest {
         Assume.assumeTrue(kafkaStorage instanceof PersistentClaimStorage);
 
         Set<String> allPvcs = new HashSet<>();
-        /*
-        Set<String> kafkaPvcs = createPvcs(kafkaStorage,
-                kafkaReplicas, podId -> KafkaCluster.getPersistentVolumeClaimName(KafkaCluster.kafkaClusterName(CLUSTER_NAME), podId)
-        );
-        Set<String> zkPvcs = createPvcs(zkStorage,
-                zkReplicas, podId -> ZookeeperCluster.getPersistentVolumeClaimName(ZookeeperCluster.zookeeperClusterName(CLUSTER_NAME), podId)
-        );
-        */
         Set<String> kafkaPvcs = createPvcs(NAMESPACE, kafkaStorage, kafkaReplicas,
             (replica, storageId) -> AbstractModel.VOLUME_NAME + "-" + storageId + "-" + KafkaCluster.kafkaPodName(CLUSTER_NAME, replica));
         Set<String> zkPvcs = createPvcs(NAMESPACE, zkStorage, zkReplicas,
@@ -661,25 +625,6 @@ public class KafkaAssemblyOperatorMockTest {
             context.assertTrue(ar.succeeded());
             assertPvcs(context, !originalKafkaDeleteClaim ? deleteClaim(zkStorage) ? emptySet() : zkPvcs :
                     deleteClaim(zkStorage) ? kafkaPvcs : allPvcs);
-
-            /*
-            if (!originalKafkaDeleteClaim) {
-
-                if (deleteClaim(zkStorage)) {
-                    emptySet();
-                } else {
-                    zkPvcs
-                }
-            } else {
-
-                if (deleteClaim(zkStorage)) {
-                    kafkaPvcs
-                } else {
-                    allPvcs
-                }
-            }
-            */
-
             deleteAsync.complete();
         });
     }
