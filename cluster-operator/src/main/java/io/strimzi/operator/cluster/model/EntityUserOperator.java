@@ -34,9 +34,6 @@ public class EntityUserOperator extends AbstractModel {
     protected static final int HEALTHCHECK_PORT = 8081;
     protected static final String HEALTHCHECK_PORT_NAME = "healthcheck";
 
-    public final static int DEFAULT_CERTS_VALIDITY_DAYS = 365;
-    public final static int DEFAULT_CERTS_RENEWAL_DAYS = 30;
-
     // User Operator configuration keys
     public static final String ENV_VAR_RESOURCE_LABELS = "STRIMZI_LABELS";
     public static final String ENV_VAR_ZOOKEEPER_CONNECT = "STRIMZI_ZOOKEEPER_CONNECT";
@@ -83,8 +80,8 @@ public class EntityUserOperator extends AbstractModel {
         this.logAndMetricsConfigVolumeName = "entity-user-operator-metrics-and-logging";
         this.logAndMetricsConfigMountPath = "/opt/user-operator/custom-config/";
         this.validLoggerFields = getDefaultLogConfig();
-        this.clientsCaValidityDays = DEFAULT_CERTS_VALIDITY_DAYS;
-        this.clientsCaRenewalDays = DEFAULT_CERTS_RENEWAL_DAYS;
+        this.clientsCaValidityDays = EntityUserOperatorSpec.DEFAULT_CERTS_VALIDITY_DAYS;
+        this.clientsCaRenewalDays = EntityUserOperatorSpec.DEFAULT_CERTS_RENEWAL_DAYS;
     }
 
     public void setWatchedNamespace(String watchedNamespace) {
@@ -193,8 +190,10 @@ public class EntityUserOperator extends AbstractModel {
                 result.setGcLoggingEnabled(userOperatorSpec.getJvmOptions() == null ? true : userOperatorSpec.getJvmOptions().isGcLoggingEnabled());
                 result.setResources(userOperatorSpec.getResources());
                 if (kafkaAssembly.getSpec().getClientsCa() != null) {
-                    result.setClientsCaValidityDays(kafkaAssembly.getSpec().getClientsCa().getValidityDays());
-                    result.setClientsCaRenewalDays(kafkaAssembly.getSpec().getClientsCa().getRenewalDays());
+                    if (kafkaAssembly.getSpec().getClientsCa().getValidityDays() != null)
+                        result.setClientsCaValidityDays(kafkaAssembly.getSpec().getClientsCa().getValidityDays());
+                    if (kafkaAssembly.getSpec().getClientsCa().getRenewalDays() != null)
+                        result.setClientsCaRenewalDays(kafkaAssembly.getSpec().getClientsCa().getRenewalDays());
                 }
             }
         }
