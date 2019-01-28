@@ -640,7 +640,8 @@ public class KafkaCluster extends AbstractModel {
      * Fill the with volumes, persistent volume claims and related volume mount paths for the storage
      * It's called recursively on the related inner volumes if the storage is of {@link Storage#TYPE_JBOD} type
      *
-     * @param storage the Storage instance from which building volumes, persistent volume claims and related volume mount paths
+     * @param storage the Storage instance from which building volumes, persistent volume claims and
+     *                related volume mount paths
      */
     private void setDataVolumesClaimsAndMountPaths(Storage storage) {
         if (storage != null) {
@@ -652,12 +653,13 @@ public class KafkaCluster extends AbstractModel {
             } else if (storage instanceof JbodStorage) {
                 for (SingleVolumeStorage volume : ((JbodStorage) storage).getVolumes()) {
                     if (volume.getId() == null)
-                        throw new InvalidResourceException("Volumes under JBOD storage type have to have id property");
+                        throw new InvalidResourceException("Volumes under JBOD storage type have to have 'id' property");
+                    // it's called recursively for setting the information from the current volume
                     setDataVolumesClaimsAndMountPaths(volume);
                 }
                 return;
             } else {
-                throw new InvalidResourceException("The declared storage is not supported");
+                throw new IllegalStateException("The declared storage is not supported");
             }
             if (id == null) {
                 id = 0;

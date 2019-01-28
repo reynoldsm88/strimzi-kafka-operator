@@ -68,8 +68,7 @@ public class KafkaSetOperator extends StatefulSetOperator {
 
         desiredKafka.setVolumeMounts(currentKafka.getVolumeMounts());
 
-        StatefulSetBuilder ssBuilder = new StatefulSetBuilder(desired);
-        StatefulSet updated = ssBuilder
+        StatefulSet updated = new StatefulSetBuilder(desired)
                 .editSpec()
                     .editTemplate()
                         .editSpec()
@@ -77,7 +76,8 @@ public class KafkaSetOperator extends StatefulSetOperator {
                                 .editMatchingEnv(e -> e.getName().equals(KafkaCluster.ENV_VAR_KAFKA_LOG_DIRS))
                                     .withValue(desiredKafka.getVolumeMounts().stream()
                                     .filter(vm -> vm.getMountPath().contains(AbstractModel.VOLUME_NAME))
-                                    .map(vm -> vm.getMountPath()).collect(Collectors.joining(",")))
+                                    .map(vm -> vm.getMountPath())
+                                    .collect(Collectors.joining(",")))
                                 .endEnv()
                             .endContainer()
                         .endSpec()
@@ -102,7 +102,8 @@ public class KafkaSetOperator extends StatefulSetOperator {
             for (PersistentVolumeClaim currentPvc : currentPvcs) {
 
                 Optional<PersistentVolumeClaim> pvc =
-                        desiredPvcs.stream().filter(desiredPvc -> desiredPvc.getMetadata().getName().equals(currentPvc.getMetadata().getName())).findFirst();
+                        desiredPvcs.stream().filter(desiredPvc -> desiredPvc.getMetadata().getName().equals(currentPvc.getMetadata().getName()))
+                                .findFirst();
 
                 if (!pvc.isPresent()) {
                     log.warn("Changing Kafka persistent storage ids is not possible. The changes will be ignored.");

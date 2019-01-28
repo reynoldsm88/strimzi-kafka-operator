@@ -280,10 +280,10 @@ public class ModelUtils {
     }
 
     /**
-     * If the provided Storage instance is a persistent claim one or a jbod containing at least a persistent volume
+     * Returns whether the given {@code Storage} instance is a persistent claim one or
+     * a JBOD containing at least one persistent volume.
      *
      * @param storage the Storage instance to check
-     * @return
      */
     public static boolean containsPersistentStorage(Storage storage) {
         boolean isPersistentClaimStorage = storage instanceof PersistentClaimStorage;

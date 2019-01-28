@@ -1002,10 +1002,8 @@ public class KafkaAssemblyOperator extends AbstractAssemblyOperator<KubernetesCl
 
         Future<ReconciliationState> zkPersistentClaimDeletion() {
             if (zkCluster.getStorage() instanceof PersistentClaimStorage) {
-
                 PersistentClaimStorage storage = (PersistentClaimStorage) zkCluster.getStorage();
                 for (int i = 0; i < zkCluster.getReplicas(); i++) {
-
                     PersistentVolumeClaim pvc = annotateDeleteClaim(reconciliation.namespace(),
                             AbstractModel.VOLUME_NAME + "-" + ZookeeperCluster.zookeeperClusterName(reconciliation.name()) + "-" + i,
                             storage.isDeleteClaim());
@@ -1469,7 +1467,6 @@ public class KafkaAssemblyOperator extends AbstractAssemblyOperator<KubernetesCl
 
         Future<ReconciliationState> kafkaPersistentClaimDeletion() {
             if (kafkaCluster.getStorage() instanceof PersistentClaimStorage) {
-
                 PersistentClaimStorage storage = (PersistentClaimStorage) kafkaCluster.getStorage();
                 for (int i = 0; i < kafkaCluster.getReplicas(); i++) {
 
@@ -1481,14 +1478,10 @@ public class KafkaAssemblyOperator extends AbstractAssemblyOperator<KubernetesCl
                     }
                 }
             } else if (kafkaCluster.getStorage() instanceof JbodStorage) {
-
                 JbodStorage storage = (JbodStorage) kafkaCluster.getStorage();
                 for (int i = 0; i < kafkaCluster.getReplicas(); i++) {
-
                     for (SingleVolumeStorage volume : storage.getVolumes()) {
-
                         if (volume instanceof PersistentClaimStorage) {
-
                             PersistentVolumeClaim pvc = annotateDeleteClaim(reconciliation.namespace(),
                                     AbstractModel.VOLUME_NAME + "-" + volume.getId() + "-" + KafkaCluster.kafkaClusterName(reconciliation.name()) + "-" + i,
                                     ((PersistentClaimStorage) volume).isDeleteClaim());
