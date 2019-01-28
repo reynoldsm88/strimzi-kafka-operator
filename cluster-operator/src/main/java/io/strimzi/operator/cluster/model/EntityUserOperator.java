@@ -190,10 +190,14 @@ public class EntityUserOperator extends AbstractModel {
                 result.setGcLoggingEnabled(userOperatorSpec.getJvmOptions() == null ? true : userOperatorSpec.getJvmOptions().isGcLoggingEnabled());
                 result.setResources(userOperatorSpec.getResources());
                 if (kafkaAssembly.getSpec().getClientsCa() != null) {
-                    if (kafkaAssembly.getSpec().getClientsCa().getValidityDays() != null)
+                    if (kafkaAssembly.getSpec().getClientsCa().getValidityDays() != null) {
+                        log.debug("Setting validity days to " + kafkaAssembly.getSpec().getClientsCa().getValidityDays());
                         result.setClientsCaValidityDays(kafkaAssembly.getSpec().getClientsCa().getValidityDays());
-                    if (kafkaAssembly.getSpec().getClientsCa().getRenewalDays() != null)
+                    }
+                    if (kafkaAssembly.getSpec().getClientsCa().getRenewalDays() != null) {
+                        log.debug("Setting renewal days to " + kafkaAssembly.getSpec().getClientsCa().getRenewalDays());
                         result.setClientsCaRenewalDays(kafkaAssembly.getSpec().getClientsCa().getRenewalDays());
+                    }
                 }
             }
         }
